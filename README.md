@@ -64,10 +64,10 @@ Harmonic distortion is evaluated separately from the full signal spectrum using 
 
 The application also calculates the corresponding current response for four simplified load models:
 
-- **R** — resistive
-- **RL** — resistive-inductive
-- **RC** — resistive-capacitive
-- **RLC** — resistive-inductive-capacitive
+- **R**—resistive
+- **RL**—resistive-inductive
+- **RC**—resistive-capacitive
+- **RLC**—resistive-inductive-capacitive
 
 These models allow the effect of the selected voltage waveform to be viewed from both voltage and current perspectives. For the RLC case, the interface also reports the calculated resonant frequency.
 
