@@ -1,96 +1,160 @@
 # Power Quality Analyzer
 
-An interactive web application for analyzing power-quality disturbances from synthetic voltage signals. The application uses the **Stationary Wavelet Transform (SWT)** for time-localized event detection and combines it with FFT-based harmonic analysis for persistent distortion.
+An interactive web application for detecting, classifying, and characterizing power-quality disturbances from synthetic voltage signals using digital signal-processing methods.
 
-## Overview
+This project was developed as a Digital Signal Processing (DSP) course project using Python, Streamlit, PyWavelets, NumPy, and Plotly.
 
-Power-quality disturbances are not all visible in the same way. Voltage sags, swells, and transients are localized in time, while harmonic distortion is present throughout the signal. This project therefore uses two complementary analysis paths:
+## Project Overview
 
-- **SWT-based analysis** for localized disturbances
-- **FFT/THD analysis** for harmonic distortion
+Power-quality disturbances have different time and frequency characteristics. Voltage sags, swells, and transients occur within limited time intervals, while harmonic distortion can persist throughout an observation window.
 
-The application presents the results through an interactive Streamlit interface, including voltage/current waveforms, wavelet coefficients, event characteristics, and automatic SWT-level evaluation.
-
-## Detected Events
-
-The current implementation supports five operating conditions:
-
-| Event | Analysis approach |
-|---|---|
-| Normal | Baseline condition |
-| Voltage Sag | SWT detail-energy detection |
-| Voltage Swell | SWT detail-energy detection |
-| Transient | SWT detail-energy detection |
-| Harmonic Distortion | FFT-based THD detection |
-
-The disturbance signals are generated mathematically rather than collected from a physical measurement system. This makes the event timing and disturbance parameters available as ground truth for evaluation.
-
-## Analysis Pipeline
+The application therefore uses the **Stationary Wavelet Transform (SWT)** as the main time-localized analysis method and a separate **FFT-based THD analysis** for persistent harmonic distortion.
 
 ```text
 Synthetic Voltage Signal
-          │
-          ▼
-   DC Offset Removal
-          │
-          ▼
-  Stationary Wavelet
-      Transform
-          │
-          ▼
-   Feature Extraction
-       (D1 Energy)
-          │
-          ▼
-   Event Detection
-          │
-          ├───────────────► FFT / THD
-          │
-          ▼
-     Classification
-          │
-          ▼
-    Characterization
-          │
-          ▼
- Interactive Visualization
+        ↓
+DC Offset Removal
+        ↓
+Stationary Wavelet Transform (SWT)
+        ↓
+Feature Extraction
+        ↓
+Event Detection
+        ↓
+Event Classification
+        ↓
+Event Characterization
+        ↓
+Interactive Visualization
 ```
 
-For localized events, the finest-scale detail coefficient (**D1**) is processed using a short rolling-energy window. The resulting energy is compared with an adaptive threshold to identify abnormal regions.
+## Supported Power-Quality Events
 
-Harmonic distortion is evaluated separately from the full signal spectrum using the fundamental component and the 3rd, 5th, and 7th harmonics.
+| Condition | Description | Main analysis |
+|---|---|---|
+| Normal | Undisturbed sinusoidal voltage | Baseline |
+| Voltage Sag | Temporary reduction in voltage magnitude | SWT-based detection |
+| Voltage Swell | Temporary increase in voltage magnitude | SWT-based detection |
+| Transient | Short-duration damped oscillatory disturbance | SWT-based detection |
+| Harmonic Distortion | Persistent harmonic components | FFT / THD |
 
-## Load Models
+The voltage signal is generated mathematically with a nominal frequency of **50 Hz** and a nominal RMS voltage of **220 V**. Because the signals are synthetic, the injected event timing is known and can be used as ground truth during evaluation.
 
-The application also calculates the corresponding current response for four simplified load models:
+## Signal Processing Method
 
-- **R**—resistive
-- **RL**—resistive-inductive
-- **RC**—resistive-capacitive
-- **RLC**—resistive-inductive-capacitive
+### Preprocessing
 
-These models allow the effect of the selected voltage waveform to be viewed from both voltage and current perspectives. For the RLC case, the interface also reports the calculated resonant frequency.
+The generated signal is first processed to remove its DC offset:
+
+```text
+x_p[n] = x[n] - mean(x)
+```
+
+### Stationary Wavelet Transform
+
+The application uses the **Stationary Wavelet Transform (SWT)** rather than a decimated DWT for the main event analysis.
+
+SWT does not downsample the signal at each decomposition level. The resulting coefficients therefore remain aligned with the original time axis, which is useful for estimating event start time, end time, and duration.
+
+Available mother wavelets:
+
+```text
+db4
+db6
+sym4
+```
+
+### Feature Extraction
+
+The main localized-event feature is the short-time energy of the **Detail Level 1 (D1)** coefficient:
+
+```text
+E[n] = rolling_mean(D1[n]^2)
+```
+
+D1 is used because it is sensitive to rapid waveform changes and short-duration disturbances.
+
+### Event Detection
+
+Localized events are detected from the D1 energy using an adaptive threshold derived from the baseline energy.
+
+Harmonic distortion is handled separately using the spectrum of the full signal. The system estimates THD from the fundamental component and selected harmonic components.
+
+### Classification
+
+After detection, the event is classified using duration, RMS level, and THD characteristics. The current rule-based classifier supports:
+
+- Transient
+- Voltage Sag
+- Voltage Swell
+- Harmonic Distortion
+- Normal
+
+### Characterization
+
+The final event characterization reports:
+
+- Event type
+- Start time
+- End time
+- Duration
+- Magnitude
+- Severity
+
+## Load and Current Simulation
+
+The application also calculates current responses for four simplified load models:
+
+- **R** — resistive
+- **RL** — resistive-inductive
+- **RC** — resistive-capacitive
+- **RLC** — resistive-inductive-capacitive
+
+The current is calculated from the same simulated voltage signal. For the RLC model, the interface also reports the calculated resonant frequency.
+
+These load models are simplified mathematical models intended for educational and comparative analysis rather than complete representations of real electrical loads.
+
+## Automatic SWT-Level Evaluation
+
+Because the test signals have known event windows, the application includes an automatic comparison of SWT decomposition levels.
+
+Two metrics are used:
+
+**Timing Error**
+
+```text
+|detected start - ground-truth start|
++
+|detected end - ground-truth end|
+```
+
+**Contrast Ratio**
+
+The ratio between D1 energy inside the event window and D1 energy outside the event window.
+
+The application marks the level with the smallest valid timing error as the recommended level.
 
 ## Main Features
 
 - Synthetic 50 Hz voltage-signal generation
 - Adjustable disturbance severity
 - Voltage sag, swell, transient, and harmonic-distortion simulation
-- SWT analysis with selectable mother wavelets (`db4`, `db6`, `sym4`)
-- Configurable decomposition level
-- Automatic SWT-level comparison
-- Event start time and duration estimation
-- Severity characterization
-- Interactive voltage/current plots with Plotly
+- Selectable SWT mother wavelet
+- Adjustable decomposition level
+- Interactive voltage and current waveforms
+- SWT-based localized event detection
+- FFT/THD-based harmonic analysis
+- Event classification and characterization
 - R, RL, RC, and RLC load simulation
-- FFT-based THD estimation for harmonic distortion
+- Automatic SWT-level evaluation
+- Interactive Plotly visualizations
 
-## Technology
+## Technology Stack
 
-| Component | Role |
+| Technology | Purpose |
 |---|---|
 | Python | Core implementation |
-| Streamlit | Interactive web interface |
+| Streamlit | Web application interface |
 | NumPy | Numerical computation |
 | PyWavelets | Stationary Wavelet Transform |
 | Plotly | Interactive visualization |
@@ -99,77 +163,94 @@ These models allow the effect of the selected voltage waveform to be viewed from
 
 ```text
 power-quality-analyzer/
-├── dsp.py
-├── dsp_core.py
-├── requirements.txt
-├── README.md
-└── .gitignore
+│
+├── power_quality_analyzer.py   # Streamlit application
+├── power_quality_core.py       # Core DSP and analysis functions
+├── requirements.txt            # Python dependencies
+├── README.md                   # Project documentation
+└── .gitignore                  # Git ignore rules
 ```
 
-### `dsp.py`
+### `power_quality_analyzer.py`
 
-Streamlit application layer. It handles user inputs, visualization, result presentation, and application flow.
+Contains the Streamlit interface, parameter controls, result presentation, and interactive visualizations.
 
-### `dsp_core.py`
+### `power_quality_core.py`
 
-Core signal-processing module containing signal generation, load-current calculation, preprocessing, SWT decomposition, feature extraction, detection, classification, characterization, and level evaluation.
+Contains the core processing pipeline, including signal generation, load-current calculation, preprocessing, SWT decomposition, feature extraction, event detection, classification, characterization, and level evaluation.
 
-## Getting Started
+## Installation
 
-### 1. Clone the repository
+Clone the repository and move into the project directory:
 
 ```bash
-git clone https://github.com/HenryAdityaEfdanusa/power-quality-analyzer.git
+git clone https://github.com/your-username/power-quality-analyzer.git
 cd power-quality-analyzer
 ```
 
-### 2. Install the dependencies
+Install the required packages:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-### 3. Run the application
+## Running the Application
+
+From the project directory:
 
 ```bash
-streamlit run dsp.py
+python -m streamlit run power_quality_analyzer.py
 ```
 
-The application will then be available through the local Streamlit server.
+Using `python -m streamlit` is useful when the `streamlit` executable is not available directly in the system PATH.
 
-## Streamlit Deployment
+The command starts a local Streamlit server and provides the local application URL in the terminal.
 
-The application can be deployed using **Streamlit Community Cloud**.
+## Streamlit Community Cloud
 
-Use:
+For deployment through Streamlit Community Cloud, use:
 
 ```text
-Main file path: dsp.py
+Repository: your-username/power-quality-analyzer
+Branch: main
+Main file path: power_quality_analyzer.py
 ```
 
-The repository root should contain `dsp.py`, `dsp_core.py`, and `requirements.txt`.
+The repository root should contain:
 
-## Evaluation Notes
+```text
+power_quality_analyzer.py
+power_quality_core.py
+requirements.txt
+```
 
-The application includes an automatic SWT-level evaluation mode because the synthetic test signals have known event windows. Two metrics are used:
+## Evaluation and Limitations
 
-- **Timing error** — difference between detected and known event boundaries
-- **Contrast ratio** — event-region D1 energy relative to the background
+The project uses **synthetically generated signals**, not measurements from a physical sensor or field monitoring system.
 
-The current implementation is intended as an educational and experimental signal-processing project. It does not represent a complete field-ready power-quality monitoring system.
+The validation procedure includes multiple disturbance types, load models, severity levels, extreme cases, and a noise-robustness test. The experiments show that detection performance depends on signal conditions; in particular, sag and swell detection becomes less reliable under broadband noise.
 
-In particular, the validation performed for this project uses synthetic signals, and performance under noise is not uniform across all event types. This limitation is retained deliberately because it is part of the experimental findings rather than being hidden behind an accuracy-only summary.
+This limitation is retained as part of the experimental findings of the current implementation.
+
+Possible future work includes:
+
+- Sensitivity analysis for R, L, and C parameters
+- Systematic comparison of mother wavelets
+- Evaluation across multiple noise levels
+- Adaptive thresholding for noisy signals
+- Testing with measured or public power-quality datasets
+- Machine-learning-based classification
 
 ## References
 
-1. J. Barros, R. I. Diego, and M. de Apráiz, “Applications of wavelets in electric power quality: Voltage events,” *Electric Power Systems Research*, vol. 88, pp. 130–136, 2012. https://doi.org/10.1016/j.epsr.2012.02.009
+1. J. Barros, R. I. Diego, and M. de Apráiz, “Applications of wavelets in electric power quality: Voltage events,” *Electric Power Systems Research*, vol. 88, pp. 130–136, 2012.
 
-2. S. N. R. Madgula, V. Veeramsetty, and R. Durgam, “Signal Processing Approaches for Power Quality Disturbance Classification: A Comprehensive Review,” *Results in Engineering*, vol. 25, 104569, 2025. https://doi.org/10.1016/j.rineng.2025.104569
+2. S. Madgula, V. Veeramsetty, and R. Durgam, “Signal Processing Approaches for Power Quality Disturbance Classification: A Comprehensive Review,” 2025.
 
-3. A. A. Memon, M. A. Koondhar, S. F. Al-Gahtani, Z. M. S. Elbarbary, and Z. M. Alaas, “Comprehensive review of power quality disturbance detection and classification techniques,” *Computers and Electrical Engineering*, vol. 126, 110512, 2025. https://doi.org/10.1016/j.compeleceng.2025.110512
+3. H. A. Mohamed-Kazim and I. Abdel-Qader, “Comprehensive review of power quality disturbance detection and classification techniques,” *Computers and Electrical Engineering*, vol. 126, Art. no. 110440, 2025.
 
-4. S. Santoso, W. M. Grady, E. J. Powers, J. Lamoree, and S. C. Bhatt, “Characterization of distribution power quality events with Fourier and wavelet transforms,” *IEEE Transactions on Power Delivery*, vol. 15, no. 1, pp. 247–254, 2000. https://doi.org/10.1109/61.847259
+4. S. Santoso, W. M. Grady, E. J. Powers, J. Lamoree, and S. C. Bhatt, “Characterization of distribution power quality events with Fourier and wavelet transforms,” *IEEE Transactions on Power Delivery*, vol. 15, no. 1, pp. 247–254, 2000.
 
-## Academic Project
+## Academic Context
 
 Developed as a **Digital Signal Processing (Pengolahan Sinyal Digital)** course project.
